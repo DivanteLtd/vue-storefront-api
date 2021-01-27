@@ -79,6 +79,7 @@
     "merge-graphql-schemas": "^1.5.2",
     "migrate": "^1.6.2",
     "mime-types": "^2.1.18",
+    "minio": "^7.0.16",
     "morgan": "^1.9.0",
     "nodemailer": "^4.6.8",
     "oauth-1.0a": "^1.0.1",

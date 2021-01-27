@@ -339,6 +339,10 @@
         "libraryOptions": {},
         "bucket": "",
         "prefix": "vue-storefront-api/image-cache"
+      },
+      "minio-s3": {
+        "libraryOptions": {},
+        "bucket": ""
       }
     },
     "action": {
