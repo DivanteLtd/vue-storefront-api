@@ -42,7 +42,7 @@ class AbstractStockProxy {
    *
    */
   check (sku) {
-    throw new Error('UserProxy::check must be implemented for specific platform')
+    throw new Error('StockProxy::check must be implemented for specific platform')
   }
 }
 
