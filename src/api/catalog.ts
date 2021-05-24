@@ -1,7 +1,6 @@
 import jwt from 'jwt-simple'
-import request from 'request'
 import ProcessorFactory from '../processor/factory'
-import { adjustBackendProxyUrl } from '../lib/elastic'
+import { getClient as esClient, adjustQuery, adjustQueryParams, getTotals } from '../lib/elastic'
 import cache from '../lib/cache-instance'
 import { sha3_224 } from 'js-sha3'
 import AttributeService from './attribute/service'
@@ -29,7 +28,7 @@ function _outputFormatter (responseBody, format = 'standard') {
     delete responseBody._shards
     if (responseBody.hits) {
       delete responseBody.hits.max_score
-      responseBody.total = responseBody.hits.total
+      responseBody.total = getTotals(responseBody)
       responseBody.hits = responseBody.hits.hits.map(hit => {
         return Object.assign(hit._source, { _score: hit._score })
       })
@@ -99,11 +98,8 @@ export default ({config, db}) => async function (req, res, body) {
     }
   }
 
-  // pass the request to elasticsearch
-  const elasticBackendUrl = adjustBackendProxyUrl(req, indexName, entityType, config)
-  const userToken = requestBody.groupToken
-
   // Decode token and get group id
+  const userToken = requestBody.groupToken
   if (userToken && userToken.length > 10) {
     /**
      * We need to use try catch so when we change the keys for encryption that not every request with a loggedin user
@@ -120,78 +116,80 @@ export default ({config, db}) => async function (req, res, body) {
   delete requestBody.groupToken
   delete requestBody.groupId
 
-  let auth = null
-
-  // Only pass auth if configured
-  if (config.elasticsearch.user || config.elasticsearch.password) {
-    auth = {
-      user: config.elasticsearch.user,
-      pass: config.elasticsearch.password
-    }
-  }
   const s = Date.now()
   const reqHash = sha3_224(`${JSON.stringify(requestBody)}${req.url}`)
   const dynamicRequestHandler = () => {
-    request({ // do the elasticsearch request
-      uri: elasticBackendUrl,
+    const reqQuery = Object.assign({}, req.query)
+    const reqQueryParams = adjustQueryParams(reqQuery, entityType, config)
+
+    const query = adjustQuery({
+      index: indexName,
       method: req.method,
-      body: requestBody,
-      json: true,
-      auth: auth
-    }, async (_err, _res, _resBody) => { // TODO: add caching layer to speed up SSR? How to invalidate products (checksum on the response BEFORE processing it)
-      if (_err || _resBody.error) {
-        console.error(_err || _resBody.error)
-        apiError(res, _err || _resBody.error)
-        return
-      }
-      try {
-        if (_resBody && _resBody.hits && _resBody.hits.hits) { // we're signing up all objects returned to the client to be able to validate them when (for example order)
-          const factory = new ProcessorFactory(config)
-          const tagsArray = []
-          if (config.server.useOutputCache && cache) {
-            const tagPrefix = entityType[0].toUpperCase() // first letter of entity name: P, T, A ...
-            tagsArray.push(entityType)
-            _resBody.hits.hits.map(item => {
-              if (item._source.id) { // has common identifier
-                tagsArray.push(`${tagPrefix}${item._source.id}`)
-              }
-            })
-            const cacheTags = tagsArray.join(' ')
-            res.setHeader('X-VS-Cache-Tags', cacheTags)
-          }
+      body: requestBody
+    }, entityType, config)
 
-          let resultProcessor = factory.getAdapter(entityType, indexName, req, res)
+    esClient(config)
+      .search(Object.assign(query, reqQueryParams))
+      .then(async response => {
+        let { body: _resBody } = response
 
-          if (!resultProcessor) { resultProcessor = factory.getAdapter('default', indexName, req, res) } // get the default processor
-
-          const productGroupId = entityType === 'product' ? groupId : undefined
-          const result = await resultProcessor.process(_resBody.hits.hits, productGroupId)
-          _resBody.hits.hits = result
-          if (entityType === 'product' && _resBody.aggregations && config.entities.attribute.loadByAttributeMetadata) {
-            const attributeListParam = AttributeService.transformAggsToAttributeListParam(_resBody.aggregations)
-            // find attribute list
-            const attributeList = await AttributeService.list(attributeListParam, config, indexName)
-            _resBody.attribute_metadata = attributeList.map(AttributeService.transformToMetadata)
-          }
-
-          _resBody = _outputFormatter(_resBody, responseFormat)
-
-          if (config.get('varnish.enabled')) {
-            // Add tags to cache, so we can display them in response headers then
-            _cacheStorageHandler(config, {
-              ..._resBody,
-              tags: tagsArray
-            }, reqHash, tagsArray)
-          } else {
-            _cacheStorageHandler(config, _resBody, reqHash, tagsArray)
-          }
+        if (_resBody.error) {
+          console.error('An error occured during catalog request:', _resBody.error)
+          apiError(res, _resBody.error)
+          return
         }
 
-        res.json(_resBody)
-      } catch (err) {
+        try {
+          if (_resBody && _resBody.hits && _resBody.hits.hits) { // we're signing up all objects returned to the client to be able to validate them when (for example order)
+            const factory = new ProcessorFactory(config)
+            const tagsArray = []
+            if (config.server.useOutputCache && cache) {
+              const tagPrefix = entityType[0].toUpperCase() // first letter of entity name: P, T, A ...
+              tagsArray.push(entityType)
+              _resBody.hits.hits.map(item => {
+                if (item._source.id) { // has common identifier
+                  tagsArray.push(`${tagPrefix}${item._source.id}`)
+                }
+              })
+              const cacheTags = tagsArray.join(' ')
+              res.setHeader('X-VS-Cache-Tags', cacheTags)
+            }
+
+            let resultProcessor = factory.getAdapter(entityType, indexName, req, res)
+
+            if (!resultProcessor) { resultProcessor = factory.getAdapter('default', indexName, req, res) } // get the default processor
+
+            const productGroupId = entityType === 'product' ? groupId : undefined
+            const result = await resultProcessor.process(_resBody.hits.hits, productGroupId)
+            _resBody.hits.hits = result
+            if (entityType === 'product' && _resBody.aggregations && config.entities.attribute.loadByAttributeMetadata) {
+              const attributeListParam = AttributeService.transformAggsToAttributeListParam(_resBody.aggregations)
+              // find attribute list
+              const attributeList = await AttributeService.list(attributeListParam, config, indexName)
+              _resBody.attribute_metadata = attributeList.map(AttributeService.transformToMetadata)
+            }
+
+            _resBody = _outputFormatter(_resBody, responseFormat)
+
+            if (config.get('varnish.enabled')) {
+              // Add tags to cache, so we can display them in response headers then
+              _cacheStorageHandler(config, {
+                ..._resBody,
+                tags: tagsArray
+              }, reqHash, tagsArray)
+            } else {
+              _cacheStorageHandler(config, _resBody, reqHash, tagsArray)
+            }
+          }
+
+          res.json(_resBody)
+        } catch (err) {
+          apiError(res, err)
+        }
+      })
+      .catch(err => {
         apiError(res, err)
-      }
-    })
+      })
   }
 
   if (config.server.useOutputCache && cache) {

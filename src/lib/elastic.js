@@ -5,25 +5,6 @@ const jsonFile = require('jsonfile')
 const es = require('@elastic/elasticsearch')
 const querystring = require('querystring')
 
-function _updateQueryStringParameter (uri, key, value) {
-  var re = new RegExp('([?&])' + key + '=.*?(&|#|$)', 'i');
-  if (uri.match(re)) {
-    if (value) {
-      return uri.replace(re, '$1' + key + '=' + value + '$2');
-    } else {
-      return uri.replace(re, '$1' + '$2');
-    }
-  } else {
-    var hash = '';
-    if (uri.indexOf('#') !== -1) {
-      hash = uri.replace(/.*#/, '#');
-      uri = uri.replace(/#.*/, '');
-    }
-    var separator = uri.indexOf('?') !== -1 ? '&' : '?';
-    return uri + separator + key + '=' + value + hash;
-  }
-}
-
 function adjustIndexName (indexName, entityType, config) {
   if (parseInt(config.elasticsearch.apiVersion) < 6) {
     return indexName
@@ -33,12 +14,19 @@ function adjustIndexName (indexName, entityType, config) {
 }
 
 function decorateBackendUrl (entityType, url, req, config) {
-  if (config.elasticsearch.useRequestFilter && typeof config.entities[entityType] === 'object') {
+  const {
+    useRequestFilter,
+    requestParamsBlacklist,
+    overwriteRequestSourceParams,
+    apiVersion
+  } = config.elasticsearch
+
+  if (useRequestFilter && typeof config.entities[entityType] === 'object') {
     const urlParts = url.split('?')
     const { includeFields, excludeFields } = config.entities[entityType]
 
     const filteredParams = Object.keys(req.query)
-      .filter(key => !config.elasticsearch.requestParamsBlacklist.includes(key))
+      .filter(key => !requestParamsBlacklist.includes(key))
       .reduce((object, key) => {
         object[key] = req.query[key]
         return object
@@ -47,17 +35,21 @@ function decorateBackendUrl (entityType, url, req, config) {
     let _source_include = includeFields || []
     let _source_exclude = excludeFields || []
 
-    if (!config.elasticsearch.overwriteRequestSourceParams) {
+    if (!overwriteRequestSourceParams) {
       const requestSourceInclude = req.query._source_include || []
       const requestSourceExclude = req.query._source_exclude || []
       _source_include = [...includeFields, ...requestSourceInclude]
       _source_exclude = [...excludeFields, ...requestSourceExclude]
     }
 
+    const isEs6AndUp = (parseInt(apiVersion) >= 6)
+    let _sourceIncludeKey = isEs6AndUp ? '_source_includes' : '_source_include'
+    let _sourceExcludeKey = isEs6AndUp ? '_source_excludes' : '_source_exclude'
+
     const urlParams = {
       ...filteredParams,
-      _source_include,
-      _source_exclude
+      [_sourceIncludeKey]: _source_include,
+      [_sourceExcludeKey]: _source_exclude
     }
     url = `${urlParts[0]}?${querystring.stringify(urlParams)}`
   }
@@ -65,30 +57,60 @@ function decorateBackendUrl (entityType, url, req, config) {
   return url
 }
 
+function adjustQueryParams (query, entityType, config) {
+  delete query.request
+  delete query.request_format
+  delete query.response_format
+
+  const {
+    apiVersion,
+    useRequestFilter,
+    overwriteRequestSourceParams,
+    requestParamsBlacklist,
+    cacheRequest
+  } = config.elasticsearch
+
+  if (useRequestFilter && !overwriteRequestSourceParams && typeof config.entities[entityType] === 'object') {
+    let { includeFields, excludeFields } = config.entities[entityType]
+    const requestSourceInclude = query._source_include ? query._source_include.split(',') : []
+    const requestSourceExclude = query._source_exclude ? query._source_exclude.split(',') : []
+    query._source_include = [...includeFields, ...requestSourceInclude]
+    query._source_exclude = [...excludeFields, ...requestSourceExclude]
+  }
+
+  if (parseInt(apiVersion) >= 6) { // legacy for ES 5
+    query._source_includes = query._source_include
+    query._source_excludes = query._source_exclude
+    delete query._source_exclude
+    delete query._source_include
+    if (cacheRequest) {
+      query.request_cache = !!cacheRequest
+    }
+  }
+
+  if (useRequestFilter && typeof config.entities[entityType] === 'object') {
+    query = Object.keys(query)
+      .filter(key => !requestParamsBlacklist.includes(key))
+      .reduce((object, key) => {
+        object[key] = query[key]
+        return object
+      }, {})
+  }
+
+  return query
+}
+
 function adjustBackendProxyUrl (req, indexName, entityType, config) {
   let url
   const queryString = require('query-string');
-  const parsedQuery = queryString.parseUrl(req.url).query
+  const parsedQuery = adjustQueryParams(queryString.parseUrl(req.url).query, config)
 
   if (parseInt(config.elasticsearch.apiVersion) < 6) { // legacy for ES 5
-    delete parsedQuery.request
-    delete parsedQuery.request_format
-    delete parsedQuery.response_format
     url = config.elasticsearch.host + ':' + config.elasticsearch.port + '/' + indexName + '/' + entityType + '/_search?' + queryString.stringify(parsedQuery)
   } else {
-    parsedQuery._source_includes = parsedQuery._source_include
-    parsedQuery._source_excludes = parsedQuery._source_exclude
-    delete parsedQuery._source_exclude
-    delete parsedQuery._source_include
-    delete parsedQuery.request
-    delete parsedQuery.request_format
-    delete parsedQuery.response_format
-    if (config.elasticsearch.cacheRequest) {
-      parsedQuery.request_cache = !!config.elasticsearch.cacheRequest
-    }
-
     url = config.elasticsearch.host + ':' + config.elasticsearch.port + '/' + adjustIndexName(indexName, entityType, config) + '/_search?' + queryString.stringify(parsedQuery)
   }
+
   if (!url.startsWith('http')) {
     url = config.elasticsearch.protocol + '://' + url
   }
@@ -99,7 +121,10 @@ function adjustBackendProxyUrl (req, indexName, entityType, config) {
 function adjustQuery (esQuery, entityType, config) {
   if (parseInt(config.elasticsearch.apiVersion) < 6) {
     esQuery.type = entityType
+  } else {
+    delete esQuery.type
   }
+
   esQuery.index = adjustIndexName(esQuery.index, entityType, config)
   return esQuery
 }
@@ -112,10 +137,27 @@ function getHits (result) {
   }
 }
 
+/**
+ * Support for ES7+ where the `total` now is an object
+ * @see https://www.elastic.co/guide/en/elasticsearch/reference/current/breaking-changes-7.0.html
+ */
+const getTotals = body => typeof body.hits.total === 'object' ? body.hits.total.value : body.hits.total
+
 let esClient = null
 function getClient (config) {
-  let { host, port, protocol, apiVersion, requestTimeout } = config.elasticsearch
-  const node = `${protocol}://${host}:${port}`
+  if (esClient) {
+    return esClient
+  }
+  
+  let { host, port, protocol, apiVersion, requestTimeout, pingTimeout } = config.elasticsearch
+
+  let nodes = []
+  let hosts = typeof host === 'string' ? host.split(',') : host
+
+  hosts.forEach(host => {
+    const node = `${protocol}://${host}:${port}`
+    nodes.push(node)
+  })
 
   let auth
   if (config.elasticsearch.user) {
@@ -123,9 +165,7 @@ function getClient (config) {
     auth = { username: user, password }
   }
 
-  if (!esClient) {
-    esClient = new es.Client({ node, auth, apiVersion, requestTimeout })
-  }
+  esClient = new es.Client({ nodes, auth, apiVersion, requestTimeout, pingTimeout })
 
   return esClient
 }
@@ -311,9 +351,11 @@ module.exports = {
   reIndex,
   search,
   adjustQuery,
+  adjustQueryParams,
   adjustBackendProxyUrl,
   getClient,
   getHits,
+  getTotals,
   adjustIndexName,
   putMappings
 }
