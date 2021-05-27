@@ -23,7 +23,7 @@ class HmacProcessor {
     return new Promise((resolve, reject) => {
       const rs = items.map((item) => {
         if (this._req.query._source_exclude && (this._req.query._source_exclude as string[]).indexOf('sgn') < 0) {
-          item._source.sgn = hmac.sign(item._source, this._config.get('objHashSecret')); // for products we sign off only price and id becase only such data is getting back with orders
+          item._source.sgn = hmac.sign(item._source, this._config.get('objHashSecret')); // for products we sign off only price and id because only such data is getting back with orders
         }
         return item
       })
