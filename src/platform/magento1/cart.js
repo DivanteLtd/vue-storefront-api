@@ -32,7 +32,7 @@ class CartProxy extends AbstractCartProxy {
     return this.api.cart.shippingInformation(customerToken, cartId, address);
   }
   collectTotals (customerToken, cartId, shippingMethod) {
-    return this.api.cart.collectTotals(customerToken, cartId, shippingMethod);
+    return this.api.cart.totals(customerToken, cartId, shippingMethod);
   }
   applyCoupon (customerToken, cartId, coupon) {
     return this.api.cart.applyCoupon(customerToken, cartId, coupon);
