@@ -4415,9 +4415,10 @@ lru-cache@^5.0.0:
   dependencies:
     yallist "^3.0.2"
 
-"mage2vuestorefront@git+https://github.com/DivanteLtd/mage2vuestorefront.git":
-  version "1.11.0"
-  resolved "git+https://github.com/DivanteLtd/mage2vuestorefront.git#6b477d35b6d11f935b1643938881969f16c87c04"
+"mage2vuestorefront@git+https://github.com/vuestorefront/mage2vuestorefront.git":
+  version "1.11.1"
+  uid a2abf48ec40d9fb761ee3f5117a1c87dc7f7c0c6
+  resolved "git+https://github.com/vuestorefront/mage2vuestorefront.git#a2abf48ec40d9fb761ee3f5117a1c87dc7f7c0c6"
   dependencies:
     "@elastic/elasticsearch" "^7.3.0"
     agentkeepalive "^3.3.0"
@@ -4428,8 +4429,8 @@ lru-cache@^5.0.0:
     jsonfile "^4.0.0"
     jwt-simple "^0.5.1"
     kue "^0.11.5"
-    lodash "^4.17.13"
-    magento2-rest-client "0.0.2"
+    lodash "^4.17.19"
+    magento2-rest-client "https://github.com/DivanteLtd/magento2-rest-client"
     moment "^2.22.2"
     node-sync "^0.2.1"
     passport "^0.3.2"
@@ -4449,19 +4450,20 @@ lru-cache@^5.0.0:
     request "^2.72.0"
     winston "^2.2.0"
 
-magento2-rest-client@0.0.2:
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/magento2-rest-client/-/magento2-rest-client-0.0.2.tgz#2a6ef230c88129a8680b63ead3793ea7e99bf6a4"
-  integrity sha1-Km7yMMiBKahoC2Pq03k+p+mb9qQ=
+"magento2-rest-client@github:vuestorefront/magento2-rest-client":
+  version "0.0.14"
+  uid "3ed81008e617abfed347ed42fb52ac9d72c8705b"
+  resolved "https://codeload.github.com/vuestorefront/magento2-rest-client/tar.gz/3ed81008e617abfed347ed42fb52ac9d72c8705b"
   dependencies:
     humps "^1.1.0"
     oauth-1.0a "^1.0.1"
     request "^2.72.0"
     winston "^2.2.0"
 
-"magento2-rest-client@github:DivanteLtd/magento2-rest-client":
-  version "0.0.12"
-  resolved "https://codeload.github.com/DivanteLtd/magento2-rest-client/tar.gz/fb5adcb24fe25e097c2127a3ded5ef05e0fcb2f7"
+"magento2-rest-client@https://github.com/DivanteLtd/magento2-rest-client":
+  version "0.0.14"
+  uid "3ed81008e617abfed347ed42fb52ac9d72c8705b"
+  resolved "https://github.com/DivanteLtd/magento2-rest-client#3ed81008e617abfed347ed42fb52ac9d72c8705b"
   dependencies:
     humps "^1.1.0"
     oauth-1.0a "^1.0.1"
@@ -4902,9 +4904,10 @@ node-sync@^0.2.1:
   resolved "https://registry.yarnpkg.com/node-sync/-/node-sync-0.2.1.tgz#06cda351516cbfc4520028ae314820fb95ec0068"
   integrity sha1-Bs2jUVFsv8RSACiuMUgg+5XsAGg=
 
-nodemailer@^4.6.8:
-  version "4.7.0"
-  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-4.7.0.tgz#4420e06abfffd77d0618f184ea49047db84f4ad8"
+nodemailer@^6.4.16:
+  version "6.4.16"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-6.4.16.tgz#5cb6391b1d79ab7eff32d6f9f48366b5a7117293"
+  integrity sha512-68K0LgZ6hmZ7PVmwL78gzNdjpj5viqBdFqKrTtr9bZbJYj6BRj5W6WGkxXrEnUl3Co3CBXi3CZBUlpV/foGnOQ==
 
 nodemon@^1.18.7:
   version "1.19.1"
@@ -6694,9 +6697,10 @@ stealthy-require@^1.1.1:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/stealthy-require/-/stealthy-require-1.1.1.tgz#35b09875b4ff49f26a777e509b3090a3226bf24b"
 
-"storefront-query-builder@https://github.com/DivanteLtd/storefront-query-builder.git":
-  version "1.0.1"
-  resolved "https://github.com/DivanteLtd/storefront-query-builder.git#0ef1f9760eb44edce5b9464a9145ce0a7517a419"
+"storefront-query-builder@https://github.com/vuestorefront/storefront-query-builder.git":
+  version "1.0.2"
+  uid "7416993f07927f598d22ca448462f0d3f0288f20"
+  resolved "https://github.com/vuestorefront/storefront-query-builder.git#7416993f07927f598d22ca448462f0d3f0288f20"
   dependencies:
     "@typescript-eslint/parser" "^2.26.0"
     clone-deep "^4.0.1"
