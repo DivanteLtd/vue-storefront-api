@@ -43,19 +43,19 @@ As a result, all necessary services will be launched:
 Product catalog is imported using [elasticdump](https://www.npmjs.com/package/elasticdump), which is installed automatically via project dependency. The default ElasticSearch index name is: `vue_storefront_catalog`
 
 - (A) `yarn restore`
-- (B) `docker exec -it vuestorefrontapi_app_1 yarn restore`
+- (B) `docker exec -it vue-storefront-api_app_1 yarn restore`
 
 Then, to update the structures in the database to the latest version (data migrations), do the following:
 
 - (A) `yarn migrate`
-- (B) `docker exec -it vuestorefrontapi_app_1 yarn migrate`
+- (B) `docker exec -it vue-storefront-api_app_1 yarn migrate`
 
 By default, the application server is started in development mode. It means that code auto reload is enabled along with ESLint, babel support.
 
 It restores JSON documents stored in `./var/catalog.json`. The opposite command - used to generate `catalog.json` file from running ElasticSearch cluster:
 
 - (A) `yarn dump`
-- (B) `docker exec -it vuestorefrontapi_app_1 yarn dump`
+- (B) `docker exec -it vue-storefront-api_app_1 yarn dump`
 
 **Access ElasticSearch data with Kibana**
 
