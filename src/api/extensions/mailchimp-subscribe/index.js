@@ -44,7 +44,7 @@ module.exports = ({ config, db }) => {
       method: 'POST',
       headers: { 'Authorization': 'apikey ' + config.extensions.mailchimp.apiKey },
       json: true,
-      body: { members: [ { email_address: userData.email, status: config.extensions.mailchimp.userStatus } ], 'update_existing': true }
+      body: { "members": [ { "email_address": userData.email, "status": config.extensions.mailchimp.userStatus } ], 'update_existing': true }
     }, (error, response, body) => {
       if (error || response.statusCode !== 200) {
         console.error(error, body)
@@ -71,7 +71,7 @@ module.exports = ({ config, db }) => {
       method: 'POST',
       headers: { 'Authorization': 'apikey ' + config.extensions.mailchimp.apiKey },
       json: true,
-      body: { members: [ { email_address: userData.email, status: 'unsubscribed' } ], 'update_existing': true }
+      body: { "members": [ { "email_address": userData.email, "status": 'unsubscribed' } ], 'update_existing': true }
     }, (error, response, body) => {
       if (error || response.statusCode !== 200) {
         console.error(error, body)
